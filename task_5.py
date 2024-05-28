@@ -1,17 +1,19 @@
 import uuid
 import networkx as nx
 import matplotlib.pyplot as plt
+from collections import deque
 
 class Node:
-    def __init__(self, key):
+    def __init__(self, key, color="skyblue"):
         self.left = None
         self.right = None
         self.val = key
-        self.id = str(uuid.uuid4()) 
+        self.color = color
+        self.id = str(uuid.uuid4())
 
 def add_edges(graph, node, pos, x=0, y=0, layer=1):
     if node is not None:
-        graph.add_node(node.id, label=node.val)
+        graph.add_node(node.id, color=node.color, label=node.val)
         if node.left:
             graph.add_edge(node.id, node.left.id)
             l = x - 1 / 2 ** layer
@@ -24,51 +26,76 @@ def add_edges(graph, node, pos, x=0, y=0, layer=1):
             r = add_edges(graph, node.right, pos, x=r, y=y - 1, layer=layer + 1)
     return graph
 
-def dfs_traversal(node, visited, colors):
-    if node is not None:
-        visited.append(node)
-        colors[node.id] = '#{:06x}'.format(0xffffff - len(visited) * 0x111111)
-        dfs_traversal(node.left, visited, colors)
-        dfs_traversal(node.right, visited, colors)
-
-def bfs_traversal(node, colors):
-    visited = []
-    queue = [node]
-
-    while queue:
-        current = queue.pop(0)
-        visited.append(current)
-        colors[current.id] = '#{:06x}'.format(0xffffff - len(visited) * 0x111111)
-
-        if current.left:
-            queue.append(current.left)
-        if current.right:
-            queue.append(current.right)
-
-def draw_tree(tree_root, traversal_type):
+def draw_tree(tree_root, colors):
     tree = nx.DiGraph()
     pos = {tree_root.id: (0, 0)}
     tree = add_edges(tree, tree_root, pos)
 
-    colors = {}
-    if traversal_type == 'dfs':
-        dfs_traversal(tree_root, [], colors)
-    elif traversal_type == 'bfs':
-        bfs_traversal(tree_root, colors)
-
     labels = {node[0]: node[1]['label'] for node in tree.nodes(data=True)}
+    node_colors = [colors[node] for node in tree.nodes()]
 
     plt.figure(figsize=(8, 5))
-    nx.draw(tree, pos=pos, labels=labels, arrows=False, node_size=2500, node_color=list(colors.values()))
+    nx.draw(tree, pos=pos, labels=labels, arrows=False, node_size=2500, node_color=node_colors)
     plt.show()
 
-root = Node(0)
-root.left = Node(1)
-root.left.left = Node(2)
-root.left.right = Node(3)
-root.right = Node(4)
-root.right.left = Node(5)
-root.right.right = Node(6)
+def bfs(root):
+    queue = deque([root])
+    visited = set()
+    order = []
+    while queue:
+        node = queue.popleft()
+        if node and node.id not in visited:
+            visited.add(node.id)
+            order.append(node)
+            queue.append(node.left)
+            queue.append(node.right)
+    return order
 
-draw_tree(root, 'dfs')
-draw_tree(root, 'bfs')
+def dfs(root):
+    stack = [root]
+    visited = set()
+    order = []
+    while stack:
+        node = stack.pop()
+        if node and node.id not in visited:
+            visited.add(node.id)
+            order.append(node)
+            stack.append(node.right)
+            stack.append(node.left)
+    return order
+
+def generate_colors(order):
+    base_color = 0x1296F0
+    colors = {}
+    for i, node in enumerate(order):
+        color = f"#{base_color + i * 0x101010:06X}"
+        colors[node.id] = color
+    return colors
+
+# Створення дерева
+root = Node(0)
+root.left = Node(4)
+root.left.left = Node(5)
+root.left.right = Node(10)
+root.right = Node(1)
+root.right.left = Node(3)
+
+# Візуалізація обходу в ширину (BFS)
+bfs_order = bfs(root)
+bfs_colors = generate_colors(bfs_order)
+print("BFS Order:")
+for node in bfs_order:
+    print(node.val, end=" ")
+print("\n")
+
+draw_tree(root, bfs_colors)
+
+# Візуалізація обходу в глибину (DFS)
+dfs_order = dfs(root)
+dfs_colors = generate_colors(dfs_order)
+print("DFS Order:")
+for node in dfs_order:
+    print(node.val, end=" ")
+print("\n")
+
+draw_tree(root, dfs_colors)
